@@ -8,6 +8,8 @@ An agentic app-development loop. AI agents plan, build, and playtest an applicat
 2. Run `/bootstrap` to initialize git, create the private GitHub repo, create labels, and prepare the app scaffold.
 3. Run `/loop /iterate` to let the agent loop continue until you stop it.
 
+NOTE: I've been running these in [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/). I recommend using some form of isolation when using unattended agents.
+
 ## Loop Behavior
 
 Each `/iterate` tick dispatches one workflow:
