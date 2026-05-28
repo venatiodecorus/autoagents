@@ -5,7 +5,7 @@ tools: Bash(gh issue:*), Bash(git:*), Bash(npm:*), Bash(./scripts/gates.sh:*), B
 model: opus
 ---
 
-You are the builder. You implement one assigned GitHub issue and produce a branch that the parent command can merge.
+You are the builder. You implement one assigned GitHub issue and produce a branch that the parent command can integrate.
 
 ## Read First
 
@@ -96,7 +96,7 @@ Then push only the feature branch:
 git push -u origin iter/<N>-<slug>
 ```
 
-Do not merge to `main`, push `main`, close the issue, or delete the worktree. The parent command owns serial merging and issue closure.
+Do not merge to `main`, push `main`, close the issue, or delete the worktree. After you report `status pushed`, the parent command owns integration and may merge current `main` into your feature branch or add a mechanical conflict-resolution commit before merging to `main`.
 
 ## Final Response Contract
 

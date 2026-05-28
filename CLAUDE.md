@@ -5,7 +5,7 @@ This repo is a template for an autonomous app-improvement loop. A human writes `
 ## Repo Layout
 
 ```
-.claude/agents/        Agent definitions: planner, builder, playtester
+.claude/agents/        Agent definitions: planner, builder, merger, playtester
 .claude/commands/      Slash commands: iterate, bootstrap, plan, build, playtest
 .llm/iter-NNN.md       Per-iteration audit log
 .llm/playtests/iter-N/ Playtester artifacts, screenshots, and notes
@@ -30,7 +30,7 @@ Framework files live at the repo root. Application code lives under `app/` unles
 | open unblocked GitHub issues exist | builder wave |
 | no open unblocked issues | playtester |
 
-Builder ticks may dispatch up to `PARALLEL_BUILDERS` isolated builder agents. Default concurrency is `2`. Each builder gets one explicit issue number and a unique git worktree under `.worktrees/`.
+Builder ticks may dispatch up to `PARALLEL_BUILDERS` isolated builder agents. Default concurrency is `2`. Each builder gets one explicit issue number and a unique git worktree under `.worktrees/`. The merger agent may be invoked by `/iterate` during integration, but it is not a top-level loop mode.
 
 ## Parallel Builder Contract
 
@@ -39,8 +39,10 @@ Builder ticks may dispatch up to `PARALLEL_BUILDERS` isolated builder agents. De
 - Builders work only inside their assigned worktree and only on their assigned issue.
 - Builders run the quality gates before committing.
 - Builders push only their feature branch. They do not merge to `main`, push `main`, or close the issue when running from `/iterate`.
-- The parent `/iterate` command waits for all builders, then serially rebases each successful branch onto current `main`, fast-forward merges it, and closes the matching issue.
-- If a branch cannot merge cleanly, `/iterate` leaves the issue open and comments with the blocker.
+- After a builder reports success, `/iterate` owns integration and may merge current `main` into that feature branch or add a mechanical conflict-resolution commit before merging to `main`.
+- The parent `/iterate` command waits for all builders, then serially merges current `main` into each successful branch, fast-forward merges `main` to that branch, and closes the matching issue.
+- If a branch has simple mechanical conflicts, `/iterate` may invoke the merger agent to resolve them, rerun gates, commit the resolution, and push the feature branch.
+- If a conflict is complex, the merger defers it for builder follow-up; `/iterate` leaves the issue open and comments with the blocker.
 
 ## GitHub Conventions
 
@@ -78,4 +80,5 @@ The playtester follows `SPEC.md` and project documentation to start and exercise
 - Planner never edits application code.
 - Playtester never edits application code or framework files.
 - Builders never edit planner/playtester definitions, slash commands, root docs, or issue workflow files unless their assigned issue explicitly asks for framework changes.
+- Merger never implements new product behavior; it only resolves simple integration conflicts on already-built branches.
 - Do not close issues without either implementing them or doing an explicit deduplication/deferral action documented in an issue comment.

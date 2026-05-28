@@ -1,5 +1,5 @@
 ---
-description: One tick of the agentic loop with parallel builders and serialized merges.
+description: One tick of the agentic loop with parallel builders, conservative conflict resolution, and serialized merges.
 allowed-tools: Bash(./scripts/iterate-dispatch.sh:*), Bash(gh:*), Bash(git:*), Bash(date:*), Bash(test:*), Bash(mkdir:*), Read, Write, Task
 ---
 
@@ -65,27 +65,53 @@ Use a 3-5 word lowercase kebab-case slug derived from the issue title. If two se
 
 Wait for every builder to finish before merging anything.
 
-## Step 3: Merge Builder Branches
+## Step 3: Integrate Builder Branches
 
 Only for `MODE=builder`.
 
-For each builder result with `status pushed`, integrate serially from the main working tree in the same priority order used for dispatch. Rebase the feature branch onto the latest `main` before the fast-forward merge so later parallel branches can still merge after earlier branches advance `main`:
+For each builder result with `status pushed`, integrate serially from the main working tree in the same priority order used for dispatch. Merge current `main` into the feature worktree first, then fast-forward `main` to the branch. This keeps conflict-resolution commits explicit and avoids rewriting feature branch history:
 
 ```bash
 git checkout main
 git pull --rebase origin main
-git -C .worktrees/iter-<N>-<slug> rebase main
+git -C .worktrees/iter-<N>-<slug> merge main
 git merge --ff-only iter/<N>-<slug>
 git push origin main
 SHA=$(git rev-parse HEAD)
 gh issue close <N> --comment "Shipped in $SHA via iter/<N>-<slug>. Builder summary: <summary>."
 ```
 
-If the rebase or merge fails, do not force it and do not close the issue. Abort any in-progress rebase in the issue worktree or merge in the main worktree if needed, leave the branch intact, and comment:
+If `git -C <worktree> merge main` fails, invoke the `merger` subagent before giving up:
+
+```text
+Run a merger iteration per your agent definition.
+Issue number: <N>
+Branch: iter/<N>-<slug>
+Worktree path: .worktrees/iter-<N>-<slug>
+Failed step: git merge main inside the feature worktree
+Error summary: <short error and conflicted files if known>
+
+Resolve only simple mechanical conflicts, run quality gates, commit and push the branch if resolved. If the conflict is complex, comment on the issue and return deferred. Do not push main or close the issue.
+```
+
+If the merger returns `status resolved`, retry:
 
 ```bash
-gh issue comment <N> --body "Parallel builder branch iter/<N>-<slug> could not be merged cleanly by /iterate. The issue remains open for follow-up. Blocker: <short error>."
+git checkout main
+git pull --rebase origin main
+git merge --ff-only iter/<N>-<slug>
+git push origin main
+SHA=$(git rev-parse HEAD)
+gh issue close <N> --comment "Shipped in $SHA via iter/<N>-<slug>. Builder summary: <summary>. Merge summary: <merger-summary>."
 ```
+
+If the merger returns `deferred` or `failed`, do not close the issue. If the merger did not already comment, add a concise comment:
+
+```bash
+gh issue comment <N> --body "Parallel builder branch iter/<N>-<slug> could not be integrated automatically by /iterate. The issue remains open for builder follow-up. Blocker: <short error>."
+```
+
+If `git merge --ff-only` fails after the worktree merge succeeded, do not force it. Pull latest `main` once and retry the worktree merge plus fast-forward sequence. If it still fails, invoke the merger if there is a concrete conflict; otherwise comment and leave the issue open.
 
 If a builder reports `blocked`, it should already have labeled/commented the issue. Include it in the iteration log but do not merge or close it.
 
@@ -108,7 +134,7 @@ agent: <planner|builder|playtester>
 
 ## Outcome
 
-<2-6 sentences summarizing what happened. For builder waves, list each issue, branch, status, merge SHA if merged, or blocker if not merged.>
+<2-6 sentences summarizing what happened. For builder waves, list each issue, branch, builder status, merger status when used, merge SHA if merged, or blocker if not merged.>
 
 ## State after
 

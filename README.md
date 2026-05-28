@@ -1,6 +1,6 @@
 # autoagents
 
-An agentic app-development loop. AI agents plan, build, and playtest an application iteratively, using GitHub issues as the shared backlog. Builder work can run in parallel safely through isolated git worktrees; final merges stay serialized.
+An agentic app-development loop. AI agents plan, build, merge, and playtest an application iteratively, using GitHub issues as the shared backlog. Builder work can run in parallel safely through isolated git worktrees; final integration stays serialized.
 
 ## Quickstart
 
@@ -26,7 +26,9 @@ Default builder concurrency is `2`. Override per run with:
 PARALLEL_BUILDERS=3 /loop /iterate
 ```
 
-Parallel builders implement separate issues in `.worktrees/iter-<issue>-<slug>` and push feature branches. The parent `/iterate` command rebases and fast-forward merges successful branches into `main` one at a time, then closes their issues.
+Parallel builders implement separate issues in `.worktrees/iter-<issue>-<slug>` and push feature branches. The parent `/iterate` command integrates successful branches into `main` one at a time, then closes their issues.
+
+During integration, `/iterate` first merges current `main` into each feature worktree. If this creates simple mechanical conflicts, it invokes the `merger` agent to resolve them, rerun gates, commit the resolution, and push the feature branch. Complex conflicts are left open for builder follow-up instead of being resolved in the merge step.
 
 ## Manual Commands
 
@@ -42,7 +44,7 @@ Parallel builders implement separate issues in `.worktrees/iter-<issue>-<slug>` 
 | `SPEC.md` | Authoritative product spec written by planner |
 | `PLAN.md` | Phased roadmap maintained by planner |
 | `CLAUDE.md` | Agent conventions and safety rules |
-| `.claude/agents/` | Planner, builder, playtester definitions |
+| `.claude/agents/` | Planner, builder, merger, playtester definitions |
 | `.claude/commands/` | Slash command workflows |
 | `.llm/` | Per-iteration audit trail and playtest artifacts |
 | `.worktrees/` | Ignored git worktrees for parallel builders |
@@ -57,4 +59,4 @@ Parallel builders implement separate issues in `.worktrees/iter-<issue>-<slug>` 
 
 ## Design Principle
 
-Parallelism is only for implementation. Builders may race on independent branches, but `main` remains single-writer: the parent command serially rebases, fast-forward merges successful branches, and leaves conflicts as open follow-up issues.
+Parallelism is only for implementation. Builders may race on independent branches, but `main` remains single-writer: the parent command serially integrates successful branches. The merger agent may resolve simple conflicts, but complex conflicts remain open for builder follow-up.
